@@ -50,6 +50,24 @@ export function buildChroniclePayload(
   }));
 }
 
+/** Chronicle backend (oracle-chronicle /api/record) record shape — one per event. */
+export type ChronicleRecord = {
+  oracle: string;
+  type: "discord_message";
+  data: { channel: string; message_id: string; author: string; content: string; ts: string };
+  ts: string;
+};
+
+/** Map a ChronicleEvent → the /api/record body the backend accepts. */
+export function toRecord(e: ChronicleEvent): ChronicleRecord {
+  return {
+    oracle: e.oracle,
+    type: "discord_message",
+    data: { channel: e.channel_id, message_id: e.message_id, author: e.author, content: e.content, ts: e.ts },
+    ts: e.ts,
+  };
+}
+
 /** Advance the cursor to the newest id seen; keep previous if nothing new. */
 export function nextCursor(messages: DiscordMessage[], prev: string | null): string | null {
   if (messages.length === 0) return prev;

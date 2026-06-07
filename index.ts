@@ -10,7 +10,7 @@ import type { InvokeContext, InvokeResult } from "maw-js/plugin/types";
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
-import { filterDelta, buildChroniclePayload, nextCursor, type DiscordMessage } from "./chronicle";
+import { filterDelta, buildChroniclePayload, nextCursor, toRecord, type DiscordMessage } from "./chronicle";
 
 export const command = {
   name: "chaiklang",
@@ -20,8 +20,8 @@ export const command = {
 const ORACLE = "chaiklang";
 const STATE_DIR = join(homedir(), ".maw", "plugins", "chaiklang");
 const STATE_FILE = join(STATE_DIR, "chronicle-state.json");
-// Backend = Atlas's oracle-board only; endpoint + token shared via env (lab).
-const DEFAULT_ENDPOINT = "https://oracle-board.laris.workers.dev/chronicle";
+// Official Chronicle backend (confirmed in workshop) — no token needed.
+const DEFAULT_ENDPOINT = "https://oracle-chronicle.laris.workers.dev/api/record";
 
 function loadCursors(): Record<string, string> {
   try { return JSON.parse(readFileSync(STATE_FILE, "utf8")); } catch { return {}; }
@@ -71,15 +71,20 @@ async function runChronicle(log: (s: string) => void, args: string[]): Promise<b
   }
 
   const endpoint = process.env.CHRONICLE_ENDPOINT || DEFAULT_ENDPOINT;
-  const res = await fetch(endpoint, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...(process.env.CHRONICLE_TOKEN ? { Authorization: `Bearer ${process.env.CHRONICLE_TOKEN}` } : {}) },
-    body: JSON.stringify({ oracle: ORACLE, channel_id: channelId, events: payload }),
-  });
-  if (!res.ok) { log(`   ✗ POST ${endpoint} → ${res.status} (cursor NOT advanced)`); return false; }
-  cursors[channelId] = advance!;          // atomic: only after 200 OK
+  const auth = process.env.CHRONICLE_TOKEN ? { Authorization: `Bearer ${process.env.CHRONICLE_TOKEN}` } : {};
+  let ok = 0;
+  for (const ev of payload) {              // /api/record takes one event per POST
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...auth },
+      body: JSON.stringify(toRecord(ev)),
+    });
+    if (!res.ok) { log(`   ✗ POST ${endpoint} → ${res.status} after ${ok} ok (cursor NOT advanced)`); return false; }
+    ok++;
+  }
+  cursors[channelId] = advance!;           // atomic: only after all events land
   saveCursors(cursors);
-  log(`   ✓ POSTed ${payload.length} events → ${endpoint} · cursor → ${advance}`);
+  log(`   ✓ POSTed ${ok} events → ${endpoint} · cursor → ${advance}`);
   return true;
 }
 

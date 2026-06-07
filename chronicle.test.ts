@@ -4,7 +4,7 @@
  * These tests ARE the client-side contract for `maw <name> chronicle`.
  */
 import { test, expect, describe } from "bun:test";
-import { isNewer, filterDelta, buildChroniclePayload, nextCursor, type DiscordMessage } from "./chronicle";
+import { isNewer, filterDelta, buildChroniclePayload, nextCursor, toRecord, type DiscordMessage } from "./chronicle";
 
 const M = (id: string, ts: string, content = "", username = "bms"): DiscordMessage => ({
   id, timestamp: ts, content, author: { username },
@@ -51,6 +51,18 @@ describe("buildChroniclePayload", () => {
   test("missing author falls back to 'unknown'", () => {
     const out = buildChroniclePayload([{ id: "1", timestamp: "t", content: "x" }], { oracle: "o", channelId: "c" });
     expect(out[0].author).toBe("unknown");
+  });
+});
+
+describe("toRecord (backend /api/record shape)", () => {
+  test("maps a ChronicleEvent to the record body the backend accepts", () => {
+    const ev = { oracle: "chaiklang", channel_id: "999", message_id: "101", ts: "2026-06-07T09:01:00.000Z", author: "bms", content: "hi" };
+    expect(toRecord(ev)).toEqual({
+      oracle: "chaiklang",
+      type: "discord_message",
+      data: { channel: "999", message_id: "101", author: "bms", content: "hi", ts: "2026-06-07T09:01:00.000Z" },
+      ts: "2026-06-07T09:01:00.000Z",
+    });
   });
 });
 
