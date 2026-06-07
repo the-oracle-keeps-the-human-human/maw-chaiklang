@@ -1,0 +1,17 @@
+{
+  "name": "chaiklang",
+  "version": "1.0.0",
+  "entry": "./index.ts",
+  "sdk": "^1.0.0",
+  "description": "ChaiKlang Oracle (ชายกลาง) — the middle switchboard. say hello, check status.",
+  "author": "chai-klang-oracle",
+  "capabilities": [],
+  "cli": {
+    "command": "chaiklang",
+    "aliases": ["ck", "chai"],
+    "help": "maw chaiklang <say|status> — the middle switchboard"
+  },
+  "weight": 50,
+  "license": "MIT",
+  "schemaVersion": 1
+}

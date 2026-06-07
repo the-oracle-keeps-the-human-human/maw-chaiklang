@@ -1,0 +1,26 @@
+# deps / build
+node_modules/
+dist/
+*.tsbuildinfo
+
+# bun
+.bun/
+
+# secrets / env — NEVER commit
+.env
+.env.*
+*.token
+*.pem
+*.key
+secrets.*
+
+# logs / tmp
+*.log
+.DS_Store
+tmp/
+.cache/
+
+# editor
+.vscode/
+.idea/
+*.swp
