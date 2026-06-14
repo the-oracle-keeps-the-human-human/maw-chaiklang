@@ -7,10 +7,11 @@
  *   maw chaiklang --tree          → command tree
  */
 import type { InvokeContext, InvokeResult } from "maw-js/plugin/types";
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from "fs";
+import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, renameSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
 import { filterDelta, buildChroniclePayload, nextCursor, toRecord, type DiscordMessage } from "./chronicle";
+import { runSat } from "./sat";
 
 export const command = {
   name: "chaiklang",
@@ -88,6 +89,45 @@ async function runChronicle(log: (s: string) => void, args: string[]): Promise<b
   return true;
 }
 
+// maw chaiklang fleet <push [ctx_pct] [note] | read>
+// Local-first fleet status via file-drop — no broker, no server, no network.
+const FLEET_DIR = join(homedir(), ".claude", "fleet");
+
+function runFleet(log: (s: string) => void, args: string[]): boolean {
+  if (!existsSync(FLEET_DIR)) mkdirSync(FLEET_DIR, { recursive: true });
+  const action = args[0]?.toLowerCase() ?? "read";
+
+  if (action === "push") {
+    const pct = Number(args[1] ?? 0) || 0;
+    const note = args.slice(2).join(" ");
+    const tmp = join(FLEET_DIR, `.${ORACLE}.tmp`);
+    const dst = join(FLEET_DIR, `${ORACLE}.json`);
+    writeFileSync(tmp, JSON.stringify({ oracle: ORACLE, ctx_pct: pct, note, ts: Math.floor(Date.now() / 1000) }));
+    renameSync(tmp, dst); // atomic — readers never see a half-written file
+    log(`📤 pushed → ${dst}`);
+    return true;
+  }
+
+  if (action === "read") {
+    const now = Math.floor(Date.now() / 1000);
+    const files = readdirSync(FLEET_DIR).filter((f) => f.endsWith(".json")).sort();
+    log("🌐 FLEET (local file-drop):");
+    if (!files.length) { log("   (empty — no oracle has pushed yet)"); return true; }
+    for (const f of files) {
+      try {
+        const d = JSON.parse(readFileSync(join(FLEET_DIR, f), "utf8"));
+        const age = now - (d.ts ?? now);
+        const dot = d.ctx_pct < 50 ? "🟢" : d.ctx_pct < 80 ? "🟡" : "🔴";
+        log(`   ${dot} ${String(d.oracle).padEnd(14)} ctx ${String(d.ctx_pct).padStart(3)}%  ${String(age).padStart(4)}s ago  ${d.note ?? ""}`);
+      } catch { /* skip malformed */ }
+    }
+    return true;
+  }
+
+  log("usage: maw chaiklang fleet <push [ctx_pct] [note] | read>");
+  return false;
+}
+
 const BORN = "2026-06-04";
 
 export default async function handler(ctx: InvokeContext): Promise<InvokeResult> {
@@ -108,6 +148,8 @@ export default async function handler(ctx: InvokeContext): Promise<InvokeResult>
     log("├── say [message]              say hello (default: hello world)");
     log("├── status                     identity + role");
     log("├── chronicle <ch> [--dry-run] incremental Discord→Chronicle sync");
+    log("├── fleet <push|read>          local-first fleet status (file-drop)");
+    log("├── sat <start> <end>          satellite-image backfill (NASA, no key)");
     log("└── --tree                     this command tree");
     return done(true);
   }
@@ -139,6 +181,10 @@ export default async function handler(ctx: InvokeContext): Promise<InvokeResult>
     }
     case "chronicle":
       return done(await runChronicle(log, args.slice(1)));
+    case "fleet":
+      return done(runFleet(log, args.slice(1)));
+    case "sat":
+      return done(await runSat(log, args.slice(1)));
     default:
       log(`unknown: ${sub} — run 'maw chaiklang --help'`);
       return done(false);
