@@ -1,0 +1,6 @@
+# derivable / heavy / local-only artifacts
+node_modules
+raw-*.mp3
+origin-stream-full.mp3
+play.log
+/tmp/
