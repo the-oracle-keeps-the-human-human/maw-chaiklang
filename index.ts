@@ -11,6 +11,7 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
 import { filterDelta, buildChroniclePayload, nextCursor, toRecord, type DiscordMessage } from "./chronicle";
+import { runGh } from "./gh";
 
 export const command = {
   name: "chaiklang",
@@ -108,6 +109,7 @@ export default async function handler(ctx: InvokeContext): Promise<InvokeResult>
     log("├── say [message]              say hello (default: hello world)");
     log("├── status                     identity + role");
     log("├── chronicle <ch> [--dry-run] incremental Discord→Chronicle sync");
+    log("├── gh <verb>                  reusable GitHub wrapper (invite/forum/comment)");
     log("└── --tree                     this command tree");
     return done(true);
   }
@@ -118,6 +120,7 @@ export default async function handler(ctx: InvokeContext): Promise<InvokeResult>
     log("  say [message]              say hello (default: hello world)");
     log("  status                     identity + role");
     log("  chronicle <ch> [--dry-run] incremental Discord→Chronicle sync (cursor-based)");
+    log("  gh <verb>                  reusable GitHub wrapper (invite/forum/comment)");
     log("  --tree                     command tree");
     return done(true);
   }
@@ -139,6 +142,8 @@ export default async function handler(ctx: InvokeContext): Promise<InvokeResult>
     }
     case "chronicle":
       return done(await runChronicle(log, args.slice(1)));
+    case "gh":
+      return done(await runGh(log, args.slice(1)));
     default:
       log(`unknown: ${sub} — run 'maw chaiklang --help'`);
       return done(false);
